@@ -23,3 +23,15 @@
 ![Market cap](http://i.imgur.com/1pwrL2M.png)  
 
 `python3.6 marketcap.py` - builds above chart
+
+
+## Google Trends / Price 
+![Google Trends](http://i.imgur.com/bvqwygY.png)  
+
+`python3.6 google-trends.py` - builds above chart
+
+
+## Bitcoin Volatility over Time sessions & Kill zones
+![Bitcoin Volatility over Time sessions](http://i.imgur.com/uRgVmiP.png)  
+
+`python3.6 killzones.py` - builds above chart
