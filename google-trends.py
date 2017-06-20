@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # Blah
-from argparse import ArgumentParser
+import argparse 
+import os
 import os.path
 import logging
 import pandas as pd
@@ -9,6 +10,7 @@ import numpy as np
 from pprint import pprint
 import sys
 import requests
+import datetime
 
 # API 
 import hmac
@@ -26,59 +28,92 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from PIL import Image
 
+# google Trends
+from pytrends.request import TrendReq
 
 
 # Configure Logging
 FORMAT = '%(asctime)s -- %(levelname)s -- %(module)s %(lineno)d -- %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger('root')
+logger.info('Beginning...')
 
 
+# Args  
+parser = argparse.ArgumentParser()
+parser.add_argument('--historical', action='store_true', help='get historical data?')
+args = parser.parse_args()
 
 
+envars = ['GUSERNAME','GPASS']
+errors = 0 
+for v in envars:
+	if os.environ.get(v) is not None:
+		logger.info('Found env var: '+v)
+		pass
+	else:
+		errors += 1 
+		pprint('Please set a '+v+' envionment variable.')
 
-# API URL request
-url = 'https://api.bitfinex.com/v2/candles/trade:1D:tBTCUSD/hist?limit=200&start=1476831600000'
+if errors > 0:
+	sys.exit()
+
+
+#####################
+# Make Trends Request
+#####################
+trend_tf = "now 7-d"
+candle_tf = "1H"
+if args.historical == True:
+	trend_tf = "today 3-m"
+	candle_tf = '1D'
+
+logger.info('Setting google trend object')
+pytrend = TrendReq(os.environ.get('GUSERNAME'), os.environ.get('GPASS'), custom_useragent='Whalepool Trend Checker')
+
+logger.info('Building google trend payload')
+pytrend.build_payload(kw_list=['bitcoin'],timeframe=trend_tf)
+
+logger.info('Making interest over time dataframe')
+trends = pytrend.interest_over_time()
+
+
+# Get the earliest record
+epoch = datetime.datetime.utcfromtimestamp(0)
+trend_start_ms = (trends.index[0] - epoch).total_seconds() * 1000.0
+logger.info('Earliest dated record from trends: '+str(trends.index[0]))
+
+
+######################
+# Make Candles Request
+######################
+url = 'https://api.bitfinex.com/v2/candles/trade:'+candle_tf+':tBTCUSD/hist?limit=200&start='+str(trend_start_ms)
 request = json.loads(requests.get(url).text)
+data_set = request
 
-url = 'https://api.bitfinex.com/v2/candles/trade:1D:tBTCUSD/hist?limit=200&end='+str(request[len(request)-1][0])
-request2 = json.loads(requests.get(url).text)
-
-url = 'https://api.bitfinex.com/v2/candles/trade:1D:tBTCUSD/hist?limit=200&end='+str(request2[len(request2)-1][0])
-request3 = json.loads(requests.get(url).text)
-
-
-data_set = request + request2 + request3 
-
+# Build candles dataframe
 candles = pd.read_json(json.dumps(data_set))
 candles.rename(columns={0:'date', 1:'open', 2:'close', 3:'high', 4:'low', 5:'volume'}, inplace=True)
 candles['date'] = pd.to_datetime( candles['date'], unit='ms' )
 candles.set_index(candles['date'], inplace=True)
-# Sort it
 candles.sort_index(inplace=True)
 
+
+######################
+# Output some data
+######################
+logger.info('Trends: ')
+pprint(trends.head())
+pprint(trends.tail())
+logger.info('Candles: ')
 pprint(candles.head())
 pprint(candles.tail())
 
 
+#######################
+# Make the plot... 
+#######################
 
-
-trends = pd.read_csv("google-trends.csv", skipinitialspace=True)
-trends.columns = ['date','trend']
-trends['date'] = pd.to_datetime( trends['date'], dayfirst=True, format="%d/%m/%Y" )
-trends.set_index(trends['date'], inplace=True)
-trends = trends.ix[candles.index[0]:]
-# del trends['date']
-
-
-pprint(trends.head())
-pprint(trends.tail())
-
-
-
-
-
-# Plot chart from csv
 # Enable a Grid
 plt.rc('axes', grid=True)
 # Set Grid preferences 
@@ -101,39 +136,7 @@ ax2t = ax1.twinx()
 ax1.set_title('Bitcoin Price / Google Trends - Whalepool.io')
 ax1.xaxis_date()
 
-
-# ax1.plot( trends.index.values, trends['trend'].values, color='b') 
-# ax1.plot( trends.index.values, trends['trend'].values, color='b') 
-
-# As a percentile
-# percentiles = trends['trend'].quantile(np.linspace(.1, 1, 9, 0))
-# percentiles = trends['trend'].quantile(np.linspace(.05, 1, 10, 0))
-# for alpha,value in percentiles.iteritems():
-# 	alpha = round(float(alpha),1)
-# 	msk = (trends['trend'] >= value)
-# 	df = trends[msk]
-# 	ax1.bar(df.index.values, df['trend'].values, width=2, alpha=alpha, color='#552B72')
-
-masks = [
-	[0, 10, 0.1],
-	[10, 20, 0.2],
-	[20, 30, 0.3],
-	[30, 40, 0.4],
-	[40, 50, 0.5],
-	[50, 60, 0.6],
-	[60, 70, 0.7],
-	[70, 80, 0.8],
-	[80, 90, 0.9],
-	[80, 100, 1]
-]
-for m in masks: 
-	msk = (trends['trend'] >= m[0]) & (trends['trend'] <= m[1])
-	df = trends[msk]
-	ax1.bar(df.index.values, df['trend'].values, width=2, alpha=m[2], color='#552B72')
-
-	
-
-
+ax1.plot( trends.index.values, trends['bitcoin'].values, color='b') 
 ax1.set_ylabel('trends', color='b')
 
 ax2t.plot( candles['date'].values, candles['close'].values, color="g", linewidth=2)

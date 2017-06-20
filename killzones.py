@@ -100,21 +100,22 @@ request2 = json.loads(requests.get(url).text)
 time.sleep(sleep_timer)
 url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request2[len(request2)-1][0])
 request3 = json.loads(requests.get(url).text)
-time.sleep(sleep_timer)
-url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request3[len(request3)-1][0])
-request4 = json.loads(requests.get(url).text)
-time.sleep(sleep_timer)
-url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request4[len(request4)-1][0])
-request5 = json.loads(requests.get(url).text)
-time.sleep(sleep_timer)
-url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request5[len(request5)-1][0])
-request6 = json.loads(requests.get(url).text)
-time.sleep(sleep_timer)
-url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request6[len(request6)-1][0])
-request7 = json.loads(requests.get(url).text)
-time.sleep(sleep_timer)
+# time.sleep(sleep_timer)
+# url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request3[len(request3)-1][0])
+# request4 = json.loads(requests.get(url).text)
+# time.sleep(sleep_timer)
+# url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request4[len(request4)-1][0])
+# request5 = json.loads(requests.get(url).text)
+# time.sleep(sleep_timer)
+# url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request5[len(request5)-1][0])
+# request6 = json.loads(requests.get(url).text)
+# time.sleep(sleep_timer)
+# url = 'https://api.bitfinex.com/v2/candles/trade:30m:tBTCUSD/hist?limit=200&end='+str(request6[len(request6)-1][0])
+# request7 = json.loads(requests.get(url).text)
+# time.sleep(sleep_timer)
 
-candles_json = request + request2 + request3 + request4 + request5 + request6 + request7
+# candles_json = request + request2 + request3 + request4 + request5 + request6 + request7
+candles_json = request + request2 + request3
 # candles_json = request 
 
 
