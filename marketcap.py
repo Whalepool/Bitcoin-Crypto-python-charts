@@ -6,6 +6,8 @@ import pandas as pd
 from pprint import pprint
 import sys
 import requests
+import os
+import utils
 
 import urllib.request
 import json
@@ -24,6 +26,15 @@ from PIL import Image
 FORMAT = '%(asctime)s -- %(levelname)s -- %(module)s %(lineno)d -- %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger('root')
+
+
+
+SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
+FILENAME     = SCRIPT_DIR+"/market-cap.png"
+LOGO_PATH	 = SCRIPT_DIR+'/media/wp_logo.jpg'
+
+
+
 
 
 is_billions = True
@@ -71,16 +82,13 @@ plt.rc('axes', grid=True)
 plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
 
 # Create a figure, 16 inches by 12 inches
-fig = plt.figure(facecolor='white', figsize=(11, 7), dpi=100)
-
+fig = plt.figure(facecolor='white', figsize=(16, 10), dpi=120)
 
 # Draw 3 rectangles
-# left, bottom, width, height
-left, width = 0.15, 0.7
-rect1 = [left, 0.1, width, 0.8]
+rect_chart = [0.05, 0.05, 0.9, 0.9]
 # rect2 = [left, 0.27, width, 0.17]
 
-ax1 = fig.add_axes(rect1, facecolor='#f6f6f6')  
+ax1 = fig.add_axes(rect_chart, facecolor='#f6f6f6')  
 ax2t = ax1.twinx()
 ax1.set_title('Bitcoin & crypto market comparisson - whalepool.io', {'fontsize': 16, 'fontweight':300})
 # x1.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
@@ -102,14 +110,18 @@ plt.xticks(index + bar_width / 2, names)
 plt.legend(handles=[ax1_legend,ax2t_legend])
 
 
-im = Image.open('media/wp_logo.jpg')
-# (fig.bbox.ymax - im.size[1])-20
-fig.figimage(im, (fig.bbox.ymax / 2)+125, (fig.bbox.ymax - im.size[1])-10)
 
+im = Image.open(LOGO_PATH)
+fig.figimage(im, 50, (fig.bbox.ymax - im.size[1])-10)
 
+plt.savefig(FILENAME)
 
-plt.savefig("marketcaps.png")
-pprint('saved')
-
-
+n = utils.Notify()
+n.telegram({
+		'chat_id': '@whalepoolbtcfeed',
+		'message': 'Bitcoin/Crypto market caps',
+		'picture': FILENAME
+	})
+print('Saved: '+FILENAME)
+os.remove(FILENAME)
 sys.exit()

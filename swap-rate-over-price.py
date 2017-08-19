@@ -9,6 +9,7 @@ from pprint import pprint
 import sys
 import requests
 import os
+import utils
 
 # API 
 import hmac
@@ -31,6 +32,16 @@ from PIL import Image
 FORMAT = '%(asctime)s -- %(levelname)s -- %(module)s %(lineno)d -- %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger('root')
+
+
+
+
+
+
+SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
+FILENAME     = SCRIPT_DIR+"/swap-rate-over-price.png"
+LOGO_PATH	 = SCRIPT_DIR+'/media/wp_logo.jpg'
+
 
 
 
@@ -103,6 +114,7 @@ urllib.request.urlretrieve("https://www.bfxdata.com/csv/"+fname, fname)
 
 
 df = pd.read_csv(fname, skipinitialspace=True)
+os.remove(SCRIPT_DIR+'/'+fname)
 del df['Timestamp']
 df['Date'] = pd.to_datetime( df['Date'] )
 df.set_index(df['Date'], inplace=True)
@@ -134,15 +146,12 @@ plt.rc('axes', grid=True)
 plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
 
 # Create a figure, 16 inches by 12 inches
-fig = plt.figure(facecolor='white', figsize=(11, 7), dpi=100)
+fig = plt.figure(facecolor='white', figsize=(16, 10), dpi=120)
 
 # Draw 3 rectangles
-# left, bottom, width, height
-left, width = 0.1, 0.8
-rect1 = [left, 0.1, width, 0.8]
-# rect2 = [left, 0.27, width, 0.17]
+rect_chart = [0.05, 0.05, 0.9, 0.9]
 
-ax1 = fig.add_axes(rect1, facecolor='#f6f6f6')  
+ax1 = fig.add_axes(rect_chart, facecolor='#f6f6f6')  
 ax1.set_xlabel('date')
 # ax2 = fig.add_axes(rect2, facecolor='#f6f6f6', sharex=ax1)
 ax2t = ax1.twinx()
@@ -158,13 +167,17 @@ ax1.set_xscale("log", nonposx='clip')
 ax2t.plot( candles['date'].values, candles_plot, color="b")
 ax2t.set_ylabel('Bitcoin Price', color='#8c8a88')
 
-im = Image.open('media/wp_logo.jpg')
-# (fig.bbox.ymax - im.size[1])-20
-fig.figimage(im, (fig.bbox.ymax / 2)+125, (fig.bbox.ymax - im.size[1])-10)
+im = Image.open(LOGO_PATH)
+fig.figimage(im, 50, (fig.bbox.ymax - im.size[1])-10)
 
-plt.savefig("btc_over_"+args.type+"_rates.png")
-pprint('saved')
+plt.savefig(FILENAME)
 
-os.remove(fname)
-
+n = utils.Notify()
+n.telegram({
+		'chat_id': '@whalepoolbtcfeed',
+		'message': plot_title_addon+'Bitcoin Price / Bitfinex '+args.type.upper()+' Daily VWap Rates',
+		'picture': FILENAME
+	})
+print('Saved: '+FILENAME)
+os.remove(FILENAME)
 sys.exit()

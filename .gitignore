@@ -1,3 +1,4 @@
 /*.png
 logs/*.log
 !media/*
+__pycache__/

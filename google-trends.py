@@ -1,34 +1,29 @@
 #!/usr/bin/env python3
 
-# Blah
-import argparse 
+# Custom
+import utils
+
+# # Blah
 import os
-import os.path
 import logging
 import pandas as pd
-import numpy as np 
 from pprint import pprint
 import sys
 import requests
 import datetime
 
-# API 
-import hmac
-import time
-import hashlib
-from future.builtins import bytes 
+# # API 
 import urllib.request
 import json
 
-# Charting
-import talib as ta
+# # Charting
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from PIL import Image
 
-# google Trends
+# # google Trends
 from pytrends.request import TrendReq
 
 
@@ -39,55 +34,41 @@ logger = logging.getLogger('root')
 logger.info('Beginning...')
 
 
-# Args  
-parser = argparse.ArgumentParser()
-parser.add_argument('--historical', action='store_true', help='get historical data?')
-args = parser.parse_args()
+# Static Vars 
+SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
+FILENAME     = SCRIPT_DIR+"/google-trends-vs-btc.png"
+GUSERNAME = os.environ.get('GUSERNAME')
+GPASS     = os.environ.get('GPASS')
 
+USER_AGENT       = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36'
+KEYWORD          = 'bitcoin'
+TRENDS_TF        = "today 3-m"
+EPOCH            = datetime.datetime.utcfromtimestamp(0)
+CANDLE_TF        = '1D'
+PLOT_TITLE 		 = 'Bitcoin Price / Google Trends - Whalepool.io'
+LOGO_PATH		 = SCRIPT_DIR+'/media/wp_logo.jpg'
 
-envars = ['GUSERNAME','GPASS']
-errors = 0 
-for v in envars:
-	if os.environ.get(v) is not None:
-		logger.info('Found env var: '+v)
-		pass
-	else:
-		errors += 1 
-		pprint('Please set a '+v+' envionment variable.')
+########################################################################
 
-if errors > 0:
-	sys.exit()
-
-
-#####################
-# Make Trends Request
-#####################
-trend_tf = "now 7-d"
-candle_tf = "1H"
-if args.historical == True:
-	trend_tf = "today 3-m"
-	candle_tf = '1D'
 
 logger.info('Setting google trend object')
-pytrend = TrendReq(os.environ.get('GUSERNAME'), os.environ.get('GPASS'), custom_useragent='Whalepool Trend Checker')
+pytrend = TrendReq(GUSERNAME, GPASS, custom_useragent=USER_AGENT)
 
 logger.info('Building google trend payload')
-pytrend.build_payload(kw_list=['bitcoin'],timeframe=trend_tf)
+pytrend.build_payload(kw_list=[KEYWORD],timeframe=TRENDS_TF)
 
 logger.info('Making interest over time dataframe')
 trends = pytrend.interest_over_time()
 
 
 # Get the earliest record
-epoch = datetime.datetime.utcfromtimestamp(0)
-trend_start_ms = (trends.index[0] - epoch).total_seconds() * 1000.0
 logger.info('Earliest dated record from trends: '+str(trends.index[0]))
+trend_start_ms = (trends.index[0] - datetime.timedelta(seconds=3600))
+trend_start_ms = int((trend_start_ms - EPOCH).total_seconds()  * 1000.0)
 
 
-######################
 # Make Candles Request
-######################
-url = 'https://api.bitfinex.com/v2/candles/trade:'+candle_tf+':tBTCUSD/hist?limit=200&start='+str(trend_start_ms)
+url = 'https://api.bitfinex.com/v2/candles/trade:'+CANDLE_TF+':tBTCUSD/hist?limit=200&start='+str(trend_start_ms)
 request = json.loads(requests.get(url).text)
 data_set = request
 
@@ -97,6 +78,9 @@ candles.rename(columns={0:'date', 1:'open', 2:'close', 3:'high', 4:'low', 5:'vol
 candles['date'] = pd.to_datetime( candles['date'], unit='ms' )
 candles.set_index(candles['date'], inplace=True)
 candles.sort_index(inplace=True)
+del candles['date']
+candles = candles.reset_index()[['date','open','high','low','close','volume']]
+candles['date'] = candles['date'].map(mdates.date2num)
 
 
 ######################
@@ -113,6 +97,38 @@ pprint(candles.tail())
 #######################
 # Make the plot... 
 #######################
+def fooCandlestick(ax, quotes, width=0.5, colorup='#FFA500', colordown='#222', alpha=1.0):
+	OFFSET = width/2.0
+	lines = []
+	boxes = []
+
+	for q in quotes:
+
+		timestamp, op, hi, lo, close = q[:5]
+		box_h = max(op, close)
+		box_l = min(op, close)
+		height = box_h - box_l
+
+		if close>=op:
+			color = '#3fd624'
+		else:
+			color = '#e83e2c'
+
+		vline_lo = Line2D( xdata=(timestamp, timestamp), ydata=(lo, box_l), color = 'k', linewidth=0.5, antialiased=True, zorder=10 )
+		vline_hi = Line2D( xdata=(timestamp, timestamp), ydata=(box_h, hi), color = 'k', linewidth=0.5, antialiased=True, zorder=10 )
+		rect = Rectangle( xy = (timestamp-OFFSET, box_l), width = width, height = height, facecolor = color, edgecolor = color, zorder=10)
+		rect.set_alpha(alpha)
+		lines.append(vline_lo)
+		lines.append(vline_hi)
+		boxes.append(rect)
+		ax.add_line(vline_lo)
+		ax.add_line(vline_hi)
+		ax.add_patch(rect)
+
+	ax.autoscale_view()
+
+	return lines, boxes
+
 
 # Enable a Grid
 plt.rc('axes', grid=True)
@@ -120,34 +136,39 @@ plt.rc('axes', grid=True)
 plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
 
 # Create a figure, 16 inches by 12 inches
-fig = plt.figure(facecolor='white', figsize=(11, 7), dpi=100)
+fig = plt.figure(facecolor='white', figsize=(16, 10), dpi=120)
 
 # Draw 3 rectangles
 # left, bottom, width, height
-left, width = 0.1, 0.8
-rect1 = [left, 0.1, width, 0.8]
-# rect2 = [left, 0.27, width, 0.17]
+rect1 = [0.05, 0.05, 0.9, 0.9]
 
 ax1 = fig.add_axes(rect1, facecolor='#f6f6f6')  
 ax1.set_xlabel('date')
-# ax2 = fig.add_axes(rect2, facecolor='#f6f6f6', sharex=ax1)
-ax2t = ax1.twinx()
+ax2 = ax1.twinx()
 
-ax1.set_title('Bitcoin Price / Google Trends - Whalepool.io')
+ax1.set_title(PLOT_TITLE)
 ax1.xaxis_date()
 
-ax1.plot( trends.index.values, trends['bitcoin'].values, color='b') 
+ax1.plot( trends.index.values, trends[KEYWORD].values, color='b') 
 ax1.set_ylabel('trends', color='b')
 
-ax2t.plot( candles['date'].values, candles['close'].values, color="g", linewidth=2)
-ax2t.set_ylabel('bitcoin price', color='g')
 
-im = Image.open('media/wp_logo.jpg')
-# (fig.bbox.ymax - im.size[1])-20
-fig.figimage(im, (fig.bbox.ymax / 2)+125, (fig.bbox.ymax - im.size[1])-10)
-
-plt.savefig("google-trends-vs-btc.png")
-pprint('saved')
+fooCandlestick(ax2, candles.values, width=0.5, colorup='g', colordown='k',alpha=0.4)
+ax2.set_ylabel('bitcoin price', color='g')
 
 
+im = Image.open(LOGO_PATH)	
+fig.figimage(   im,   105,  (fig.bbox.ymax - im.size[1])-29)
+
+plt.savefig(FILENAME)
+
+
+n = utils.Notify()
+n.telegram({
+		'chat_id': '@whalepoolbtcfeed',
+		'message': KEYWORD+' google trends / bitcoin price',
+		'picture': FILENAME
+	})
+print('Saved: '+FILENAME)
+os.remove(FILENAME)
 sys.exit()

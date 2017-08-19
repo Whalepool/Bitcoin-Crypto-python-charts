@@ -8,6 +8,7 @@ import pandas as pd
 from pprint import pprint
 import sys
 import requests
+import utils
 
 # API 
 import hmac
@@ -34,6 +35,10 @@ logger = logging.getLogger('root')
 
 
 
+
+SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
+FILENAME     = SCRIPT_DIR+"/mempool-vs-btc.png"
+LOGO_PATH	 = SCRIPT_DIR+'/media/wp_logo.jpg'
 
 
 
@@ -98,15 +103,13 @@ plt.rc('axes', grid=True)
 plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
 
 # Create a figure, 16 inches by 12 inches
-fig = plt.figure(facecolor='white', figsize=(11, 7), dpi=100)
+fig = plt.figure(facecolor='white', figsize=(16, 10), dpi=120)
 
 # Draw 3 rectangles
-# left, bottom, width, height
-left, width = 0.1, 0.8
-rect1 = [left, 0.1, width, 0.8]
+rect_chart = [0.05, 0.05, 0.9, 0.9]
 # rect2 = [left, 0.27, width, 0.17]
 
-ax1 = fig.add_axes(rect1, facecolor='#f6f6f6')  
+ax1 = fig.add_axes(rect_chart, facecolor='#f6f6f6')  
 ax1.set_xlabel('date')
 # ax2 = fig.add_axes(rect2, facecolor='#f6f6f6', sharex=ax1)
 ax2t = ax1.twinx()
@@ -122,12 +125,23 @@ ax1.set_ylabel('bytes', color='b')
 ax2t.plot( candles['date'].values, candles['close'].values, color="g")
 ax2t.set_ylabel('bitcoin price', color='g')
 
-im = Image.open('media/wp_logo.jpg')
-# (fig.bbox.ymax - im.size[1])-20
-fig.figimage(im, (fig.bbox.ymax / 2)+125, (fig.bbox.ymax - im.size[1])-10)
-
-plt.savefig("mempool-over-btc.png")
-pprint('saved')
 
 
+
+im = Image.open(LOGO_PATH)
+fig.figimage(im, 50, (fig.bbox.ymax - im.size[1])-10)
+
+
+
+plt.savefig(FILENAME)
+
+
+n = utils.Notify()
+n.telegram({
+		'chat_id': '@whalepoolbtcfeed',
+		'message': 'Bitcoin mempool vs btc',
+		'picture': FILENAME
+	})
+print('Saved: '+FILENAME)
+os.remove(FILENAME)
 sys.exit()
